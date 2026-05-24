@@ -125,13 +125,16 @@ app.UseAuthentication();
 app.UseAuthorization();
 app.UseAntiforgery();
 
-// OCI registry API (/v2/...) — must be reachable before the Blazor fallback.
-app.MapOci();
-app.MapAuthEndpoints();
-
+// Static assets + Blazor first: MapStaticAssets must be registered before the other
+// endpoint maps, otherwise framework files (e.g. _framework/blazor.web.js) 404. Endpoint
+// precedence still routes the specific /v2/... routes to OCI regardless of registration order.
 app.MapStaticAssets();
 app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode();
+
+// OCI registry API (/v2/...).
+app.MapOci();
+app.MapAuthEndpoints();
 
 app.Run();
 
