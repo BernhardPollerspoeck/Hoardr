@@ -1,0 +1,36 @@
+@page "/login"
+@layout PublicLayout
+
+<PageTitle>Hoardr — Login</PageTitle>
+
+<section class="login-wrap">
+    <div class="login-card">
+        <h1>Sign in</h1>
+        <p class="muted">Use your account, or <code>master</code> + your master token.</p>
+
+        @if (Error == 1)
+        {
+            <p class="form-error">Invalid username or password.</p>
+        }
+
+        <form method="post" action="/login" class="login-form">
+            <input type="hidden" name="returnUrl" value="@ReturnUrl" />
+            <label class="field">
+                <span>Username</span>
+                <input class="input" name="username" autocomplete="username" autofocus required />
+            </label>
+            <label class="field">
+                <span>Password</span>
+                <input class="input" name="password" type="password" autocomplete="current-password" required />
+            </label>
+            <button class="btn btn-primary btn-block" type="submit">Sign in</button>
+        </form>
+
+        <p class="login-foot">New here? <a href="/setup">Read the setup guide</a> · <a href="/">Back to home</a></p>
+    </div>
+</section>
+
+@code {
+    [SupplyParameterFromQuery] public int Error { get; set; }
+    [SupplyParameterFromQuery] public string? ReturnUrl { get; set; }
+}

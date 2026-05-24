@@ -1,0 +1,39 @@
+@inherits LayoutComponentBase
+
+<div class="app-shell">
+    <header class="topbar">
+        <a class="brand" href="/app">
+            <span class="brand-mark">◆</span> Hoardr
+        </a>
+        <nav class="topnav">
+            <NavLink class="navlink" href="/app" Match="NavLinkMatch.All">Repositories</NavLink>
+            <AuthorizeView Roles="master">
+                <NavLink class="navlink" href="/admin">Admin</NavLink>
+            </AuthorizeView>
+        </nav>
+        <div class="topbar-user">
+            <GithubLink Class="gh-link-muted" />
+            <AuthorizeView>
+                <Authorized>
+                    <span class="user-chip">
+                        <span class="dot"></span>
+                        @context.User.Identity?.Name
+                    </span>
+                    <form method="post" action="/logout" class="logout-form">
+                        <button type="submit" class="btn btn-ghost btn-sm">Logout</button>
+                    </form>
+                </Authorized>
+            </AuthorizeView>
+        </div>
+    </header>
+
+    <main class="content">
+        @Body
+    </main>
+</div>
+
+<div id="blazor-error-ui" data-nosnippet>
+    An unexpected error occurred.
+    <a href="." class="reload">Reload</a>
+    <span class="dismiss">🗙</span>
+</div>

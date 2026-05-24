@@ -1,0 +1,11 @@
+**/bin/
+**/obj/
+**/data/
+data/
+shots/
+.git/
+.github/
+.vs/
+*.user
+*.suo
+**/appsettings.Development.json

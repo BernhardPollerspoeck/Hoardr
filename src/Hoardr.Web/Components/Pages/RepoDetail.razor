@@ -1,0 +1,90 @@
+@page "/repo/{*Name}"
+@rendermode InteractiveServer
+@attribute [Authorize]
+@using Hoardr.Web.Ui
+@inject RegistryMetadata Meta
+@inject AccountService Accounts
+
+<PageTitle>Hoardr · @Name</PageTitle>
+
+<div class="breadcrumb">
+    <a href="/app">Repositories</a> <span class="sep">/</span> <strong>@Name</strong>
+</div>
+
+@if (!_allowed)
+{
+    <div class="empty-state">
+        <h2>No access</h2>
+        <p class="muted">You don't have pull permission for this repository.</p>
+    </div>
+}
+else
+{
+    <div class="page-head">
+        <div>
+            <h1>@Name</h1>
+            <p class="muted">@_tags.Count tag@(_tags.Count == 1 ? "" : "s") · @Humanize.Bytes(_stats.TotalBytes) total</p>
+        </div>
+    </div>
+
+    @if (_tags.Count == 0)
+    {
+        <div class="empty-state">
+            <h2>No tags</h2>
+            <p class="muted">This repository has no tagged images yet.</p>
+        </div>
+    }
+    else
+    {
+        <div class="card table-card">
+            <table class="data-table">
+                <thead>
+                    <tr><th>Tag</th><th>Digest</th><th>Size</th><th>Pushed</th></tr>
+                </thead>
+                <tbody>
+                    @foreach (var t in _tags)
+                    {
+                        <tr>
+                            <td><span class="tag-pill">@t.Name</span></td>
+                            <td class="mono muted">@Short(t.Digest)</td>
+                            <td>@Humanize.Bytes(t.Size)</td>
+                            <td class="muted">@Humanize.Ago(t.PushedAt)</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+}
+
+@code {
+    [Parameter] public string Name { get; set; } = "";
+    [CascadingParameter] private Task<AuthenticationState> AuthState { get; set; } = default!;
+
+    private bool _allowed;
+    private RepoStats _stats = new("", 0, 0);
+    private List<TagView> _tags = [];
+
+    private record TagView(string Name, Digest Digest, long Size, DateTime PushedAt);
+
+    protected override async Task OnInitializedAsync()
+    {
+        var user = (await AuthState).User;
+        var accountId = ulong.Parse(user.FindFirst("account_id")?.Value ?? "0");
+        _allowed = user.IsInRole("master") || Accounts.CanPull(accountId, Name);
+        if (!_allowed)
+            return;
+
+        _stats = Meta.GetRepoStats(Name);
+        _tags = [.. Meta.ListTags(Name)
+            .OrderByDescending(t => t.PushedAt)
+            .Select(t => new TagView(t.Name, t.ManifestDigest, ManifestSize(t.ManifestDigest), t.PushedAt))];
+    }
+
+    private long ManifestSize(Digest manifest)
+        => Meta.GetChildren(manifest)
+            .Where(c => c.Kind == ManifestChildKind.Blob)
+            .Sum(c => Meta.GetBlob(c.Digest)?.Size ?? 0);
+
+    private static string Short(Digest d) => "sha256:" + d.Hex[..12];
+}

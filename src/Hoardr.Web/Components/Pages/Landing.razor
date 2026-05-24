@@ -1,0 +1,241 @@
+@page "/"
+@layout PublicLayout
+
+<PageTitle>Hoardr — the self-hosted container registry you'll enjoy running</PageTitle>
+
+<!-- ============================================================ Hero -->
+<section class="hero">
+    <div class="hero-inner">
+        <span class="eyebrow">Open source · self-hosted · OCI-compatible</span>
+        <h1 class="hero-title">A container registry you'll&nbsp;actually&nbsp;enjoy running.</h1>
+        <p class="hero-sub">
+            Hoardr speaks the OCI Distribution spec — so <code>docker push</code> and <code>pull</code> just work —
+            runs as a <strong>single process with no external database</strong>, cleans up after itself,
+            and ships with a genuinely nice admin UI. Free and open source.
+        </p>
+
+        <div class="hero-cta">
+            <GithubLink Star="true" Class="btn-lg" />
+            <a class="btn btn-primary btn-lg" href="/setup">Get started</a>
+            <a class="btn btn-ghost btn-lg" href="/login">Login</a>
+        </div>
+
+        <div class="code hero-code">
+            <code>docker run -d -p 8080:8080 -e Hoardr__MasterToken=change-me -v hoardr:/app/data ghcr.io/bernhardpollerspoeck/hoardr:latest</code>
+            <button class="copy-btn" data-copy="docker run -d -p 8080:8080 -e Hoardr__MasterToken=change-me -v hoardr:/app/data ghcr.io/bernhardpollerspoeck/hoardr:latest" type="button">Copy</button>
+        </div>
+        <p class="hero-note">That's the whole install. One container, one volume.</p>
+    </div>
+</section>
+
+<!-- ===================================================== Comparison -->
+<section id="why" class="section">
+    <div class="section-head">
+        <h2>Why teams pick Hoardr</h2>
+        <p class="muted">Serious features — without <code>nginx.conf</code> and <code>htpasswd</code> gymnastics.</p>
+    </div>
+    <div class="compare-wrap">
+        <table class="compare">
+            <thead>
+                <tr>
+                    <th></th>
+                    <th class="col-hoardr">Hoardr</th>
+                    <th>Docker Registry<br /><span class="th-sub">+ nginx / htpasswd</span></th>
+                    <th>Harbor</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <th>Works with <code>docker push/pull</code></th>
+                    <td class="col-hoardr"><span class="yes">✓</span></td><td><span class="yes">✓</span></td><td><span class="yes">✓</span></td>
+                </tr>
+                <tr>
+                    <th>Web UI to manage it</th>
+                    <td class="col-hoardr"><span class="yes">✓</span></td><td><span class="no">✗</span></td><td><span class="yes">✓</span></td>
+                </tr>
+                <tr>
+                    <th>Built-in user management</th>
+                    <td class="col-hoardr"><span class="yes">✓</span></td><td><span class="no">✗ <small>htpasswd files</small></span></td><td><span class="yes">✓</span></td>
+                </tr>
+                <tr>
+                    <th>Per-repo pull / push / delete</th>
+                    <td class="col-hoardr"><span class="yes">✓</span></td><td><span class="no">✗ <small>proxy hacks</small></span></td><td><span class="yes">✓</span></td>
+                </tr>
+                <tr class="row-star">
+                    <th>Auto-<code>latest</code> per repo</th>
+                    <td class="col-hoardr"><span class="yes">★ ✓</span></td><td><span class="no">✗</span></td><td><span class="no">✗</span></td>
+                </tr>
+                <tr>
+                    <th>Automatic tag retention + GC</th>
+                    <td class="col-hoardr"><span class="yes">✓</span></td><td><span class="meh">manual</span></td><td><span class="yes">✓</span></td>
+                </tr>
+                <tr>
+                    <th>Disk-space alerts</th>
+                    <td class="col-hoardr"><span class="yes">✓</span></td><td><span class="no">✗</span></td><td><span class="meh">~</span></td>
+                </tr>
+                <tr>
+                    <th>No external database</th>
+                    <td class="col-hoardr"><span class="yes">✓</span></td><td><span class="yes">✓</span></td><td><span class="no">✗ <small>Postgres+</small></span></td>
+                </tr>
+                <tr>
+                    <th>Backup / restore</th>
+                    <td class="col-hoardr"><span class="yes">✓ <small>copy one folder</small></span></td><td><span class="meh">files + htpasswd</span></td><td><span class="meh">DB dump + volumes</span></td>
+                </tr>
+                <tr>
+                    <th>Setup</th>
+                    <td class="col-hoardr"><strong>1 container</strong></td><td>nginx + htpasswd</td><td>many services</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</section>
+
+<!-- ======================================================== Features -->
+<section id="features" class="section">
+    <div class="section-head">
+        <h2>Everything a registry needs. Nothing it doesn't.</h2>
+        <p class="muted">Real features, without the operational weight.</p>
+    </div>
+
+    <div class="feature-grid">
+        <article class="feature">
+            <div class="feature-ic">🐳</div>
+            <h3>Works with Docker, today</h3>
+            <p>Full OCI Distribution spec. Point <code>docker login</code> at it and push — no client changes, no surprises.</p>
+        </article>
+        <article class="feature">
+            <div class="feature-ic">📦</div>
+            <h3>Dead-simple to host</h3>
+            <p>One process. Blobs on disk, metadata in an embedded database. No Postgres, no Redis, no sidecars — it runs anywhere a container runs.</p>
+        </article>
+        <article class="feature">
+            <div class="feature-ic">🧹</div>
+            <h3>Cleans up after itself</h3>
+            <p>Automatic tag retention keeps the newest tags and ages out the rest; two-stage garbage collection reclaims the disk. Set it and forget it.</p>
+        </article>
+        <article class="feature">
+            <div class="feature-ic">🔔</div>
+            <h3>Never silently fills up</h3>
+            <p>Built-in disk-space alerts over <a href="https://ntfy.sh" target="_blank" rel="noopener noreferrer">ntfy</a> warn you the moment storage crosses your threshold.</p>
+        </article>
+        <article class="feature">
+            <div class="feature-ic">🔐</div>
+            <h3>Real access control</h3>
+            <p>Per-repository <strong>pull / push / delete</strong> permissions. A master token for admin, accounts for everyone else. No enterprise rituals.</p>
+        </article>
+        <article class="feature">
+            <div class="feature-ic">🌿</div>
+            <h3>Yours, forever</h3>
+            <p>MIT-licensed and self-hosted. No seats, no usage limits, no SaaS lock-in. Your images stay on your infrastructure.</p>
+        </article>
+        <article class="feature">
+            <div class="feature-ic">🧩</div>
+            <h3>Multi-arch images</h3>
+            <p>Manifest lists are first-class — push <code>amd64</code> and <code>arm64</code> under one tag, clients pull the right one.</p>
+        </article>
+        <article class="feature">
+            <div class="feature-ic">🗂️</div>
+            <h3>Backup is one folder</h3>
+            <p>Blobs and all metadata — accounts, permissions, tags, even keys — live in one directory. Copy it and the whole registry is backed up.</p>
+        </article>
+        <article class="feature">
+            <div class="feature-ic">🛟</div>
+            <h3>Crash-safe by design</h3>
+            <p>Atomic writes, race-safe dedup, and abandoned uploads cleaned up automatically. No corrupted layers, no babysitting.</p>
+        </article>
+    </div>
+</section>
+
+<!-- ====================================================== Spotlight: auto-latest -->
+<section class="spotlight">
+    <div class="spotlight-inner">
+        <span class="eyebrow eyebrow-light">One less chore</span>
+        <h2>Push a version. <code>latest</code> just follows.</h2>
+        <p>
+            Stop hand-tagging <code>latest</code> in every pipeline. Flip on <strong>auto-latest</strong> per
+            repository and Hoardr keeps <code>latest</code> pinned to your most recently pushed tag — automatically,
+            on every push, with zero extra CI steps.
+        </p>
+        <div class="spotlight-demo">
+            <span class="demo-cmd">docker push registry.example.com/team/api:1.4.2</span>
+            <span class="demo-arrow">→</span>
+            <span class="demo-chip">latest → 1.4.2 ✓</span>
+        </div>
+    </div>
+</section>
+
+<!-- ==================================================== Built for CI -->
+<section class="section section-tint">
+    <div class="section-head">
+        <h2>Built for your pipeline</h2>
+        <p class="muted">Shaped around build → push → deploy, not bolted on after.</p>
+    </div>
+    <div class="ci-points">
+        <div class="ci-point">
+            <span class="ci-ic">🔑</span>
+            <h4>Push-only tokens</h4>
+            <p>Give CI an account that can push but never delete. Least privilege by default.</p>
+        </div>
+        <div class="ci-point">
+            <span class="ci-ic">🏷️</span>
+            <h4>Auto-latest</h4>
+            <p>Each build's tag becomes <code>latest</code> automatically — zero extra pipeline steps.</p>
+        </div>
+        <div class="ci-point">
+            <span class="ci-ic">🧹</span>
+            <h4>Hands-off cleanup</h4>
+            <p>Retention + GC keep the registry lean as builds pile up. Set once, forget.</p>
+        </div>
+    </div>
+</section>
+
+<!-- ====================================================== Quickstart -->
+<section class="section">
+    <div class="section-head">
+        <h2>From zero to pushing in three steps</h2>
+    </div>
+    <ol class="steps">
+        <li>
+            <div class="step-n">1</div>
+            <div class="step-body">
+                <h3>Run it</h3>
+                <div class="code">
+                    <code>docker run -d -p 8080:8080 -e Hoardr__MasterToken=change-me -v hoardr:/app/data ghcr.io/bernhardpollerspoeck/hoardr:latest</code>
+                    <button class="copy-btn" data-copy="docker run -d -p 8080:8080 -e Hoardr__MasterToken=change-me -v hoardr:/app/data ghcr.io/bernhardpollerspoeck/hoardr:latest" type="button">Copy</button>
+                </div>
+            </div>
+        </li>
+        <li>
+            <div class="step-n">2</div>
+            <div class="step-body">
+                <h3>Log in</h3>
+                <div class="code">
+                    <code>docker login registry.example.com -u master -p change-me</code>
+                    <button class="copy-btn" data-copy="docker login registry.example.com -u master -p change-me" type="button">Copy</button>
+                </div>
+            </div>
+        </li>
+        <li>
+            <div class="step-n">3</div>
+            <div class="step-body">
+                <h3>Push</h3>
+                <div class="code">
+                    <code>docker tag myapp registry.example.com/team/myapp:1.0 &amp;&amp; docker push registry.example.com/team/myapp:1.0</code>
+                    <button class="copy-btn" data-copy="docker tag myapp registry.example.com/team/myapp:1.0 && docker push registry.example.com/team/myapp:1.0" type="button">Copy</button>
+                </div>
+            </div>
+        </li>
+    </ol>
+    <p class="center"><a href="/setup">Full setup guide →</a></p>
+</section>
+
+<!-- ======================================================= Final CTA -->
+<section class="cta-band">
+    <h2>Run the best registry you've ever self-hosted.</h2>
+    <p>Free and open source under the MIT license. Star it, host it, own it.</p>
+    <div class="hero-cta">
+        <GithubLink Star="true" Class="btn-lg" />
+        <a class="btn btn-primary btn-lg" href="/setup">Get started</a>
+    </div>
+    <p class="byline">Built by <a href="@HoardrLinks.AuthorUrl" target="_blank" rel="noopener noreferrer">@HoardrLinks.Author</a> for everyone.</p>
+</section>

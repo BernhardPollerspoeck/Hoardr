@@ -1,0 +1,36 @@
+@inherits LayoutComponentBase
+
+<div class="public-shell">
+    <header class="public-topbar">
+        <a class="brand" href="/"><span class="brand-mark">◆</span> Hoardr</a>
+        <nav class="public-nav">
+            <a href="/#features">Features</a>
+            <a href="/#why">Why</a>
+            <a href="/faq">FAQ</a>
+            <a href="/setup">Setup</a>
+        </nav>
+        <div class="public-actions">
+            <GithubLink Star="true" />
+            <a class="btn btn-primary" href="/login">Login</a>
+        </div>
+    </header>
+
+    <main>@Body</main>
+
+    <footer class="public-footer">
+        <div class="footer-inner">
+            <div class="footer-brand"><span class="brand-mark">◆</span> Hoardr</div>
+            <nav class="footer-links">
+                <a href="/#features">Features</a>
+                <a href="/faq">FAQ</a>
+                <a href="/setup">Setup</a>
+                <a href="@HoardrLinks.Repo" target="_blank" rel="noopener noreferrer">GitHub</a>
+                <a href="@HoardrLinks.License" target="_blank" rel="noopener noreferrer">MIT License</a>
+            </nav>
+        </div>
+        <div class="footer-meta">
+            Built by <a href="@HoardrLinks.AuthorUrl" target="_blank" rel="noopener noreferrer">@HoardrLinks.Author</a>
+            for everyone · free &amp; open source
+        </div>
+    </footer>
+</div>

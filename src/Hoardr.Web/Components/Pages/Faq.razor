@@ -1,0 +1,84 @@
+@page "/faq"
+@layout PublicLayout
+
+<PageTitle>Hoardr — FAQ</PageTitle>
+
+<article class="doc">
+    <header class="doc-head">
+        <h1>Frequently asked questions</h1>
+        <p class="muted">Short answers. The <a href="/setup">setup guide</a> has the details.</p>
+    </header>
+
+    <div class="faq">
+        <details open>
+            <summary>Is it really free?</summary>
+            <p>Yes — Hoardr is open source under the MIT license. No seats, no usage limits, no paid tiers.
+               Host as many instances as you like.</p>
+        </details>
+
+        <details>
+            <summary>Where's the code?</summary>
+            <p>On GitHub: <a href="@HoardrLinks.Repo" target="_blank" rel="noopener noreferrer">@HoardrLinks.Repo</a>.
+               Stars and contributions are very welcome.</p>
+        </details>
+
+        <details>
+            <summary>Does <code>docker push</code> / <code>pull</code> really just work?</summary>
+            <p>Yes. Hoardr implements the OCI Distribution Spec, so standard Docker and OCI clients talk to it
+               unmodified — including multi-arch images (manifest lists).</p>
+        </details>
+
+        <details>
+            <summary>How does authentication work?</summary>
+            <p>A <strong>master token</strong> (set via environment variable) has full access and is used to bootstrap.
+               Everyone else is a DB <strong>account</strong> with <strong>per-repository</strong> permissions:
+               <code>pull</code>, <code>push</code> and <code>delete</code> are granted separately — so CI can push
+               without being able to delete.</p>
+        </details>
+
+        <details>
+            <summary>How do old tags get cleaned up?</summary>
+            <p>Tag retention is hybrid: it always keeps the <em>N</em> newest tags per repository, and of the rest
+               deletes those older than a configurable age. Defaults are global and can be overridden per repository
+               in the admin UI. Untagged manifests and unreferenced blobs are then reclaimed by garbage collection.</p>
+        </details>
+
+        <details>
+            <summary>How does garbage collection reclaim space?</summary>
+            <p>Two stages: unreferenced manifests are removed first (cascading through multi-arch indexes), then blobs
+               with no remaining references are deleted from disk after a short grace period that protects
+               freshly-uploaded layers.</p>
+        </details>
+
+        <details>
+            <summary>Can it warn me before the disk fills up?</summary>
+            <p>Yes. Hoardr watches the data drive and sends a push notification via
+               <a href="https://ntfy.sh" target="_blank" rel="noopener noreferrer">ntfy</a> when usage crosses your
+               threshold (default 80%). Configure it in the admin UI.</p>
+        </details>
+
+        <details>
+            <summary>Where is my data stored, and how do I back up?</summary>
+            <p>Image blobs live on disk under your data directory; everything else (accounts, permissions, manifests,
+               tags, settings) lives in the embedded database in the same directory. Back up that one directory and
+               you've backed up the whole registry.</p>
+        </details>
+
+        <details>
+            <summary>What does it run on?</summary>
+            <p>A single .NET 10 process — no external database, cache or sidecars. Run the container anywhere, put
+               HTTPS (e.g. a reverse proxy) in front, and you're done.</p>
+        </details>
+
+        <details>
+            <summary>How can I contribute?</summary>
+            <p>Open an issue or PR on <a href="@HoardrLinks.Repo" target="_blank" rel="noopener noreferrer">GitHub</a>.
+               Bug reports, docs and feature ideas all help.</p>
+        </details>
+    </div>
+
+    <div class="doc-cta">
+        <GithubLink Star="true" />
+        <a class="btn btn-primary" href="/setup">Setup guide</a>
+    </div>
+</article>

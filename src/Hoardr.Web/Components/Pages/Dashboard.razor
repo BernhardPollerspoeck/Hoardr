@@ -1,0 +1,71 @@
+@page "/app"
+@rendermode InteractiveServer
+@attribute [Authorize]
+@using Hoardr.Web.Ui
+@inject RegistryMetadata Meta
+@inject AccountService Accounts
+
+<PageTitle>Hoardr · Repositories</PageTitle>
+
+<div class="page-head">
+    <div>
+        <h1>Repositories</h1>
+        <p class="muted">@(_repos.Count) repositor@(_repos.Count == 1 ? "y" : "ies") visible</p>
+    </div>
+</div>
+
+@if (_repos.Count == 0)
+{
+    <div class="empty-state">
+        <h2>Nothing here yet</h2>
+        <p class="muted">Once images are pushed, they'll show up here.</p>
+    </div>
+}
+else
+{
+    <div class="card-grid">
+        @foreach (var r in _repos)
+        {
+            <a class="card repo-card" href="@($"/repo/{r.Repo}")">
+                <div class="repo-card-head">
+                    <span class="repo-icon">▣</span>
+                    <span class="repo-name">@r.Repo</span>
+                </div>
+                <div class="repo-card-stats">
+                    <div class="stat">
+                        <span class="stat-value">@r.TagCount</span>
+                        <span class="stat-label">Tags</span>
+                    </div>
+                    <div class="stat">
+                        <span class="stat-value">@Humanize.Bytes(r.TotalBytes)</span>
+                        <span class="stat-label">Size</span>
+                    </div>
+                </div>
+            </a>
+        }
+    </div>
+}
+
+@code {
+    [CascadingParameter] private Task<AuthenticationState> AuthState { get; set; } = default!;
+
+    private List<RepoStats> _repos = [];
+
+    protected override async Task OnInitializedAsync()
+    {
+        var user = (await AuthState).User;
+
+        IEnumerable<string> repoNames;
+        if (user.IsInRole("master"))
+        {
+            repoNames = Meta.ListRepos();
+        }
+        else
+        {
+            var accountId = ulong.Parse(user.FindFirst("account_id")?.Value ?? "0");
+            repoNames = Accounts.ListPermissions(accountId).Where(p => p.CanPull).Select(p => p.Repo);
+        }
+
+        _repos = [.. repoNames.Select(Meta.GetRepoStats)];
+    }
+}

@@ -1,0 +1,125 @@
+@page "/setup"
+@layout PublicLayout
+
+<PageTitle>Hoardr — Setup</PageTitle>
+
+<article class="doc">
+    <header class="doc-head">
+        <h1>Setup guide</h1>
+        <p class="muted">Self-host Hoardr in a few minutes.</p>
+    </header>
+
+    <h2>1. Run it (Docker Compose)</h2>
+    <p>Copy this into <code>docker-compose.yml</code>, set a strong master token, then
+       <code>docker compose up -d</code>. The <code>./data</code> mount holds your blobs and database —
+       that one folder is your whole registry, so back it up.</p>
+    <div class="code">
+        <code>@Compose</code>
+        <button class="copy-btn" data-copy="@Compose" type="button">Copy</button>
+    </div>
+
+    <p class="muted">Prefer a one-liner? <code>docker run</code> works too:</p>
+    <div class="code">
+        <code>@DockerRun</code>
+        <button class="copy-btn" data-copy="@DockerRun" type="button">Copy</button>
+    </div>
+
+    <h3>Configuration</h3>
+    <p>All settings are environment variables (double underscore = nested):</p>
+    <table class="data-table doc-table">
+        <thead><tr><th>Variable</th><th>Default</th><th>Purpose</th></tr></thead>
+        <tbody>
+            <tr><td class="mono">Hoardr__MasterToken</td><td>—</td><td>Admin token (full access). Required.</td></tr>
+            <tr><td class="mono">Hoardr__DataRoot</td><td>./data</td><td>Where blobs + database live.</td></tr>
+            <tr><td class="mono">Hoardr__Retention__KeepMin</td><td>10</td><td>Newest tags always kept per repo.</td></tr>
+            <tr><td class="mono">Hoardr__Retention__MaxAgeDays</td><td>30</td><td>Older tags beyond KeepMin are removed (0 = never).</td></tr>
+        </tbody>
+    </table>
+
+    <h2>2. Port &amp; HTTPS</h2>
+    <p>Hoardr serves HTTP on <strong>8080</strong> by default. Change the port or switch on built-in HTTPS with these
+       variables — no reverse proxy required (one still works if you prefer it). Docker requires HTTPS for any
+       registry that isn't <code>localhost</code>.</p>
+    <table class="data-table doc-table">
+        <thead><tr><th>Variable</th><th>Default</th><th>Purpose</th></tr></thead>
+        <tbody>
+            <tr><td class="mono">Hoardr__Http__Port</td><td>8080</td><td>HTTP listen port</td></tr>
+            <tr><td class="mono">Hoardr__Https__Enabled</td><td>false</td><td>turn on HTTPS</td></tr>
+            <tr><td class="mono">Hoardr__Https__Port</td><td>8443</td><td>HTTPS listen port</td></tr>
+            <tr><td class="mono">Hoardr__Https__CertPath</td><td>—</td><td>a PFX bundle, or your <code>.cer</code>/<code>.pem</code> certificate</td></tr>
+            <tr><td class="mono">Hoardr__Https__CertKeyPath</td><td>—</td><td>private <code>.key</code> when using cert + key</td></tr>
+            <tr><td class="mono">Hoardr__Https__CertPassword</td><td>—</td><td>password for a PFX bundle</td></tr>
+        </tbody>
+    </table>
+    <p>Two ways to give a certificate: a single <strong>PFX</strong> (<code>CertPath</code> + <code>CertPassword</code>),
+       or a separate <strong>.cer + .key</strong> (<code>CertPath</code> + <code>CertKeyPath</code> — PEM or DER, RSA or EC).
+       With HTTPS on and no certificate, a self-signed dev cert is used (local testing only).</p>
+    <div class="code">
+        <code>@HttpsCompose</code>
+        <button class="copy-btn" data-copy="@HttpsCompose" type="button">Copy</button>
+    </div>
+
+    <h2>3. Log in &amp; push</h2>
+    <div class="code">
+        <code>docker login registry.example.com -u master -p &lt;your-master-token&gt;
+docker tag myapp registry.example.com/team/myapp:1.0
+docker push registry.example.com/team/myapp:1.0</code>
+        <button class="copy-btn" data-copy="docker login registry.example.com -u master -p <your-master-token>" type="button">Copy</button>
+    </div>
+
+    <h2>4. Create accounts &amp; permissions</h2>
+    <p>Open the web UI, click <strong>Login</strong>, sign in with username <code>master</code> and your token.
+       In <strong>Admin → Accounts</strong> create users and grant per-repository <code>pull</code> / <code>push</code> /
+       <code>delete</code>. Give CI a push-only account so it can't delete tags.</p>
+
+    <h2>5. Tag retention</h2>
+    <p>Set a global default with the <code>Hoardr__Retention__*</code> variables, then override per repository under
+       <strong>Admin → Tag Retention</strong>. Hoardr keeps the newest tags and ages out the rest automatically.</p>
+
+    <h2>6. Disk-space alerts (optional)</h2>
+    <p>Under <strong>Admin → ntfy</strong>, enable alerts, set your ntfy server + topic (and token if private), and a
+       threshold. Hoardr pushes a warning when storage crosses it.</p>
+
+    <div class="doc-cta">
+        <GithubLink Star="true" />
+        <a class="btn btn-primary" href="/login">Open the dashboard</a>
+    </div>
+</article>
+
+@code {
+    private const string Compose = """
+services:
+  hoardr:
+    image: ghcr.io/bernhardpollerspoeck/hoardr:latest
+    container_name: hoardr
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      Hoardr__MasterToken: "change-me"          # use a long random secret
+      Hoardr__DataRoot: "/data"
+      Hoardr__Retention__KeepMin: "10"
+      Hoardr__Retention__MaxAgeDays: "30"
+    volumes:
+      - ./data:/data                            # blobs + database -> back this up
+""";
+
+    private const string DockerRun =
+        "docker run -d --name hoardr -p 8080:8080 -e Hoardr__MasterToken=change-me -e Hoardr__DataRoot=/data -v \"$(pwd)/data:/data\" ghcr.io/bernhardpollerspoeck/hoardr:latest";
+
+    private const string HttpsCompose = """
+services:
+  hoardr:
+    image: ghcr.io/bernhardpollerspoeck/hoardr:latest
+    ports:
+      - "8443:8443"
+    environment:
+      Hoardr__MasterToken: "change-me"
+      Hoardr__Https__Enabled: "true"
+      Hoardr__Https__CertPath: "/certs/registry.cer"
+      Hoardr__Https__CertKeyPath: "/certs/registry.key"
+    volumes:
+      - ./data:/data
+      - ./certs:/certs:ro
+""";
+}

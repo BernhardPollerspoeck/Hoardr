@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630" font-family="system-ui, -apple-system, Segoe UI, Roboto, sans-serif">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#f5f8f0"/>
+      <stop offset="1" stop-color="#e6f0d8"/>
+    </linearGradient>
+  </defs>
+  <rect width="1200" height="630" fill="url(#bg)"/>
+  <g transform="translate(90,140)">
+    <rect width="64" height="64" rx="14" fill="#5e9440"/>
+    <path d="M32 14l16 18-16 18-16-18z" fill="#eaf3df"/>
+    <text x="84" y="48" font-size="52" font-weight="700" fill="#3f6b29">Hoardr</text>
+  </g>
+  <text x="90" y="330" font-size="62" font-weight="700" fill="#2c3626">The self-hosted container</text>
+  <text x="90" y="402" font-size="62" font-weight="700" fill="#2c3626">registry you'll enjoy running.</text>
+  <text x="90" y="476" font-size="32" fill="#5b6b4f">OCI-compatible · single process · cleans up after itself · free &amp; open source</text>
+  <text x="90" y="560" font-size="28" font-weight="600" fill="#5e9440">github.com/BernhardPollerspoeck/Hoardr</text>
+</svg>

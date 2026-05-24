@@ -1,0 +1,43 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <base href="/" />
+    <meta name="description" content="Hoardr — a self-hosted, OCI-compatible container registry. Docker push/pull just works, runs as a single process, cleans up after itself, with per-repo auth and a nice admin UI. Free & open source." />
+    <meta property="og:title" content="Hoardr — the self-hosted container registry you'll enjoy running" />
+    <meta property="og:description" content="OCI-compatible, single process, cleans up after itself, with a genuinely nice admin UI. Free & open source." />
+    <meta property="og:type" content="website" />
+    <meta property="og:image" content="/og-image.svg" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Hoardr — self-hosted container registry" />
+    <meta name="twitter:description" content="Docker-compatible, dead-simple to host, cleans up after itself. Free & open source." />
+    <meta name="twitter:image" content="/og-image.svg" />
+    <meta name="theme-color" content="#5e9440" />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <ResourcePreloader />
+    <link rel="stylesheet" href="@Assets["app.css"]" />
+    <link rel="stylesheet" href="@Assets["Hoardr.Web.styles.css"]" />
+    <ImportMap />
+    <HeadOutlet />
+</head>
+
+<body>
+    <Routes />
+    <ReconnectModal />
+    <script src="@Assets["_framework/blazor.web.js"]"></script>
+    <script>
+        // Copy-to-clipboard for code blocks (works on static SSR pages too).
+        document.addEventListener('click', e => {
+            const btn = e.target.closest('.copy-btn');
+            if (!btn) return;
+            navigator.clipboard?.writeText(btn.dataset.copy || '');
+            const original = btn.textContent;
+            btn.textContent = 'Copied';
+            setTimeout(() => { btn.textContent = original; }, 1200);
+        });
+    </script>
+</body>
+
+</html>

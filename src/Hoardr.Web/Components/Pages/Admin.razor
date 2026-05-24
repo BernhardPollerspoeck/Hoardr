@@ -1,0 +1,276 @@
+@page "/admin"
+@rendermode InteractiveServer
+@attribute [Authorize(Roles = "master")]
+@using Hoardr.Core.Workers
+@using Hoardr.Web.Ui
+@inject AccountService Accounts
+@inject RegistryMetadata Meta
+@inject RetentionService Retention
+@inject RepoSettingsService RepoSettings
+@inject NtfyService Ntfy
+@inject DiskSpaceMonitor Disk
+
+<PageTitle>Hoardr · Admin</PageTitle>
+
+<div class="page-head"><h1>Admin</h1></div>
+
+<!-- ===================================================== Accounts -->
+<section class="card admin-section">
+    <h2>Accounts</h2>
+
+    <div class="inline-form">
+        <input class="input" placeholder="Name" @bind="_newName" />
+        <input class="input" type="password" placeholder="Password" @bind="_newPassword" />
+        <button class="btn btn-primary" @onclick="CreateAccount">Create</button>
+        @if (_accountMsg is not null) { <span class="form-msg">@_accountMsg</span> }
+    </div>
+
+    <table class="data-table">
+        <thead><tr><th>Name</th><th title="May create new repos by pushing (CI first-push)">Create repos</th><th>Permissions</th><th></th></tr></thead>
+        <tbody>
+            @foreach (var a in _accounts)
+            {
+                <tr>
+                    <td><strong>@a.Name</strong></td>
+                    <td>
+                        <label class="check" title="May create new repos by pushing to them (CI first-push)">
+                            <input type="checkbox" checked="@a.CanCreate"
+                                   @onchange="e => ToggleCanCreate(a, (bool)e.Value!)" />
+                        </label>
+                    </td>
+                    <td>
+                        @foreach (var p in Accounts.ListPermissions(a.Id))
+                        {
+                            <span class="perm-pill">@p.Repo @(p.CanPull ? "↓" : "") @(p.CanPush ? "↑" : "") @(p.CanDelete ? "✕" : "")</span>
+                        }
+                    </td>
+                    <td class="right">
+                        <button class="btn btn-ghost" @onclick="() => Select(a)">Permissions</button>
+                        <button class="btn btn-danger" @onclick="() => DeleteAccount(a)">Delete</button>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+
+    @if (_selected is not null)
+    {
+        <div class="subpanel">
+            <h3>Permission for <em>@_selected.Name</em></h3>
+            @if (_repos.Count == 0)
+            {
+                <p class="muted">No repositories yet — push an image first to create one.</p>
+            }
+            <div class="inline-form">
+                <select class="input" @bind="_permRepo">
+                    <option value="">— select repository —</option>
+                    @foreach (var repo in _repos)
+                    {
+                        <option value="@repo">@repo</option>
+                    }
+                </select>
+                <label class="check"><input type="checkbox" @bind="_permPull" /> pull</label>
+                <label class="check"><input type="checkbox" @bind="_permPush" /> push</label>
+                <label class="check"><input type="checkbox" @bind="_permDelete" /> delete</label>
+                <button class="btn btn-primary" @onclick="SetPermission">Set</button>
+            </div>
+        </div>
+    }
+</section>
+
+<!-- ===================================================== Retention -->
+<section class="card admin-section">
+    <h2>Tag retention</h2>
+    <p class="muted">
+        Global: keep at least <strong>@Retention.Default.KeepMin</strong> newest tags,
+        delete tags older than <strong>@Retention.Default.MaxAgeDays</strong> days beyond that.
+        Overridable per repository.
+    </p>
+
+    <table class="data-table">
+        <thead><tr><th>Repository</th><th title="Allow anonymous pull (open-source images)">Public&nbsp;pull</th><th>Auto&nbsp;latest</th><th>keep_min</th><th>max_age (days)</th><th>Source</th><th></th></tr></thead>
+        <tbody>
+            @foreach (var repo in _repos)
+            {
+                var ov = Retention.GetOverride(repo);
+                var eff = Retention.GetEffective(repo);
+                var autoLatest = RepoSettings.GetAutoLatest(repo);
+                var publicRead = RepoSettings.GetPublicRead(repo);
+                <tr>
+                    <td>@repo</td>
+                    <td>
+                        <label class="check" title="Allow anyone to pull this repo without logging in">
+                            <input type="checkbox" checked="@publicRead"
+                                   @onchange="e => TogglePublic(repo, (bool)e.Value!)" />
+                        </label>
+                    </td>
+                    <td>
+                        <label class="check" title="Keep 'latest' on the most recently pushed tag">
+                            <input type="checkbox" checked="@autoLatest"
+                                   @onchange="e => ToggleAutoLatest(repo, (bool)e.Value!)" />
+                        </label>
+                    </td>
+                    <td>@eff.KeepMin</td>
+                    <td>@eff.MaxAgeDays</td>
+                    <td>@(ov is null ? "Default" : "Override")</td>
+                    <td class="right">
+                        <button class="btn btn-ghost" @onclick="() => EditRetention(repo, eff)">Edit</button>
+                        @if (ov is not null)
+                        {
+                            <button class="btn btn-danger" @onclick="() => RemoveOverride(repo)">Remove override</button>
+                        }
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+
+    @if (_retentionRepo is not null)
+    {
+        <div class="subpanel">
+            <h3>Override for <em>@_retentionRepo</em></h3>
+            <div class="inline-form">
+                <label class="check">keep_min <input class="input small" type="number" min="0" @bind="_keepMin" /></label>
+                <label class="check">max_age (days) <input class="input small" type="number" min="0" @bind="_maxAge" /></label>
+                <button class="btn btn-primary" @onclick="SaveOverride">Save</button>
+            </div>
+        </div>
+    }
+</section>
+
+<!-- ===================================================== ntfy -->
+<section class="card admin-section">
+    <h2>ntfy storage alerts</h2>
+
+    @{ var usage = Disk.CurrentUsage(); }
+    <div class="disk-meter">
+        <div class="disk-bar"><div class="disk-fill @(usage.UsedPercent >= _ntfy.ThresholdPercent ? "over" : "")" style="width:@(usage.UsedPercent)%"></div></div>
+        <span class="muted">@usage.UsedPercent % used · @Humanize.Bytes(usage.FreeBytes) free of @Humanize.Bytes(usage.TotalBytes)</span>
+    </div>
+
+    <div class="form-grid">
+        <label class="check"><input type="checkbox" @bind="_ntfy.Enabled" /> Enabled</label>
+        <label class="field"><span>Server</span><input class="input" @bind="_ntfy.Server" /></label>
+        <label class="field"><span>Topic</span><input class="input" @bind="_ntfy.Topic" placeholder="hoardr-alerts" /></label>
+        <label class="field"><span>Token (optional)</span><input class="input" type="password" @bind="_ntfy.Token" /></label>
+        <label class="field"><span>Threshold (%)</span><input class="input small" type="number" min="1" max="99" @bind="_ntfy.ThresholdPercent" /></label>
+    </div>
+    <div class="inline-form">
+        <button class="btn btn-primary" @onclick="SaveNtfy">Save</button>
+        <button class="btn btn-ghost" @onclick="TestNtfy">Send test</button>
+        @if (_ntfyMsg is not null) { <span class="form-msg">@_ntfyMsg</span> }
+    </div>
+</section>
+
+@code {
+    private List<AccountRecord> _accounts = [];
+    private List<string> _repos = [];
+
+    private string _newName = "";
+    private string _newPassword = "";
+    private string? _accountMsg;
+
+    private AccountRecord? _selected;
+    private string _permRepo = "";
+    private bool _permPull = true;
+    private bool _permPush;
+    private bool _permDelete;
+
+    private string? _retentionRepo;
+    private int _keepMin;
+    private int _maxAge;
+
+    private NtfyConfig _ntfy = NtfyConfig.Default;
+    private string? _ntfyMsg;
+
+    protected override void OnInitialized()
+    {
+        Reload();
+        _ntfy = Ntfy.GetConfig();
+    }
+
+    private void Reload()
+    {
+        _accounts = [.. Accounts.ListAccounts()];
+        _repos = [.. Meta.ListRepos()];
+    }
+
+    // --- accounts ---
+    private void CreateAccount()
+    {
+        if (string.IsNullOrWhiteSpace(_newName) || string.IsNullOrWhiteSpace(_newPassword))
+        {
+            _accountMsg = "Name and password are required.";
+            return;
+        }
+        var created = Accounts.CreateAccount(_newName.Trim(), _newPassword);
+        _accountMsg = created is null ? "Name already taken." : $"Account '{created.Name}' created.";
+        _newName = _newPassword = "";
+        Reload();
+    }
+
+    private void DeleteAccount(AccountRecord a)
+    {
+        Accounts.DeleteAccount(a.Id);
+        if (_selected?.Id == a.Id) _selected = null;
+        Reload();
+    }
+
+    private void ToggleCanCreate(AccountRecord a, bool enabled)
+    {
+        Accounts.SetCanCreate(a.Id, enabled);
+        Reload();
+    }
+
+    private void Select(AccountRecord a)
+    {
+        _selected = a;
+        _permRepo = "";
+        _permPull = true;
+        _permPush = false;
+        _permDelete = false;
+    }
+
+    private void SetPermission()
+    {
+        if (_selected is null || string.IsNullOrWhiteSpace(_permRepo)) return;
+        Accounts.SetPermission(_selected.Id, _permRepo.Trim(), _permPull, _permPush, _permDelete);
+        _permRepo = "";
+    }
+
+    // --- retention ---
+    private void EditRetention(string repo, RetentionPolicy eff)
+    {
+        _retentionRepo = repo;
+        _keepMin = eff.KeepMin;
+        _maxAge = eff.MaxAgeDays;
+    }
+
+    private void SaveOverride()
+    {
+        if (_retentionRepo is null) return;
+        Retention.SetOverride(_retentionRepo, _keepMin, _maxAge);
+        _retentionRepo = null;
+    }
+
+    private void RemoveOverride(string repo) => Retention.RemoveOverride(repo);
+
+    // --- per-repo settings ---
+    private void ToggleAutoLatest(string repo, bool enabled) => RepoSettings.SetAutoLatest(repo, enabled);
+
+    private void TogglePublic(string repo, bool enabled) => RepoSettings.SetPublicRead(repo, enabled);
+
+    // --- ntfy ---
+    private void SaveNtfy()
+    {
+        Ntfy.SaveConfig(_ntfy);
+        _ntfyMsg = "Saved.";
+    }
+
+    private async Task TestNtfy()
+    {
+        Ntfy.SaveConfig(_ntfy);
+        var ok = await Ntfy.SendAsync("Hoardr test", "Test notification from Hoardr.", "default", "white_check_mark");
+        _ntfyMsg = ok ? "Test sent ✓" : "Send failed (enabled? topic set?).";
+    }
+}

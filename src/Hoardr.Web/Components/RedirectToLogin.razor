@@ -1,0 +1,10 @@
+@inject NavigationManager Nav
+
+@code {
+    // Rendered by AuthorizeRouteView's NotAuthorized: bounce anonymous users to the styled login.
+    protected override void OnInitialized()
+    {
+        var returnUrl = Uri.EscapeDataString(new Uri(Nav.Uri).PathAndQuery);
+        Nav.NavigateTo($"/login?returnUrl={returnUrl}", forceLoad: true);
+    }
+}
