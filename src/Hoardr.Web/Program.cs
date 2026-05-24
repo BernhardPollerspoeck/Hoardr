@@ -123,20 +123,15 @@ if (!app.Environment.IsDevelopment())
 app.UseStatusCodePagesWithReExecute("/not-found", createScopeForStatusCodePages: true);
 app.UseAuthentication();
 app.UseAuthorization();
-// Serve physical wwwroot files (incl. /_framework/*) via middleware. MapStaticAssets only
-// exposes the *fingerprinted* asset endpoints, so a request for the un-fingerprinted
-// /_framework/blazor.web.js would 404. UseStaticFiles serves the real file. Order matters:
-// it must come before UseAntiforgery (mirrors SproutDB's SproutAdminExtensions).
-app.UseStaticFiles();
 app.UseAntiforgery();
+
+// OCI registry API (/v2/...) — must be reachable before the Blazor fallback.
+app.MapOci();
+app.MapAuthEndpoints();
 
 app.MapStaticAssets();
 app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode();
-
-// OCI registry API (/v2/...).
-app.MapOci();
-app.MapAuthEndpoints();
 
 app.Run();
 

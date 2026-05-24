@@ -1,6 +1,7 @@
 <Solution>
   <Folder Name="/Solution Items/">
     <File Path=".gitignore" />
+    <File Path="Dockerfile" />
   </Folder>
   <Project Path="src/Hoardr.Core/Hoardr.Core.csproj" />
   <Project Path="src/Hoardr.Tests/Hoardr.Tests.csproj" />
