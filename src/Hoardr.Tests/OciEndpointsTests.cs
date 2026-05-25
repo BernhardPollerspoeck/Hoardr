@@ -40,11 +40,15 @@ public class OciEndpointsTests : IClassFixture<RegistryAppFactory>
     }
 
     [Fact]
-    public async Task Base_Endpoint_Allows_Anonymous_Probe()
+    public async Task Base_Endpoint_Challenges_Anonymous()
     {
-        // No credentials → 200, so anonymous pulls of public repos can proceed.
+        // Unauthenticated /v2/ must return 401 + WWW-Authenticate so clients (docker, Azure DevOps, …)
+        // know to send credentials. Returning 200 here makes them push without auth → 401 loop.
+        // Anonymous pulls of public repos still work via the manifest/blob endpoints
+        // (see Anonymous_Pull_Allowed_On_Public_Repo).
         var resp = await _factory.CreateClient().GetAsync("/v2/");
-        Assert.Equal(HttpStatusCode.OK, resp.StatusCode);
+        Assert.Equal(HttpStatusCode.Unauthorized, resp.StatusCode);
+        Assert.Contains("Basic", resp.Headers.WwwAuthenticate.ToString());
     }
 
     [Fact]

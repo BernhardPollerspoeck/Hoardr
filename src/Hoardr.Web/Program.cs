@@ -32,7 +32,9 @@ builder.Host.UseSerilog((context, loggerConfig) => loggerConfig
     .MinimumLevel.Information()
     .MinimumLevel.Override("Microsoft.AspNetCore", LogEventLevel.Warning)
     .Enrich.FromLogContext()
-    .WriteTo.Console()
+    // Console (Docker stdout): warnings+ only — keeps push output clean while still surfacing
+    // auth denials/errors. Full Information detail (incl. per-request logs) goes to the file.
+    .WriteTo.Console(restrictedToMinimumLevel: LogEventLevel.Warning)
     .WriteTo.File(
         Path.Combine(logDirectory, "hoardr-.log"),
         rollingInterval: RollingInterval.Day,

@@ -30,15 +30,19 @@ public static class OciRegistryEndpoints
 
         path = path ?? "";
 
-        // GET /v2/ — API probe. Validate creds if provided (so `docker login` fails on bad
-        // credentials), but allow an anonymous probe so anonymous pulls can proceed.
+        // GET /v2/ — API version check AND the auth handshake. An unauthenticated ping MUST be
+        // answered with 401 + WWW-Authenticate so clients learn to send credentials (the de-facto
+        // Docker token-auth flow). Returning 200 here is OCI-legal but breaks real clients
+        // (e.g. Azure DevOps' docker): they conclude "no auth needed" and then push WITHOUT
+        // credentials → 401 loop. Anonymous pulls of public repos still work — the manifest/blob
+        // endpoints allow anonymous reads, so the client just proceeds after the challenge.
         if (path.Length == 0 || path == "/")
         {
-            var credentialsProvided = !string.IsNullOrEmpty(ctx.Request.Headers.Authorization);
-            if (credentialsProvided && identity is null)
+            if (identity is null)
             {
-                log.LogWarning("OCI /v2 probe: rejected invalid credentials for user '{User}'", AuthUser(ctx));
-                await WriteError(ctx, 401, "UNAUTHORIZED", "invalid credentials");
+                if (!string.IsNullOrEmpty(ctx.Request.Headers.Authorization))
+                    log.LogWarning("OCI /v2 ping: rejected invalid credentials for user '{User}'", AuthUser(ctx));
+                await WriteError(ctx, 401, "UNAUTHORIZED", "authentication required");
                 return;
             }
             ctx.Response.Headers["Docker-Distribution-API-Version"] = "registry/2.0";

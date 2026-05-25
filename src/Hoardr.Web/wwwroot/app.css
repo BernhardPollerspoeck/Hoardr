@@ -229,6 +229,35 @@ h3 { font-size: 1rem; font-weight: 600; margin: 0 0 .75rem; }
 .refresh-icon.spinning { animation: spin .7s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
 
+/* ---------------------------------------------------------------- confirm modal */
+.modal-backdrop {
+    position: fixed; inset: 0; z-index: 1000;
+    background: rgba(20, 30, 18, .45);
+    display: flex; align-items: center; justify-content: center;
+    padding: 1rem;
+}
+.modal-card {
+    background: var(--surface);
+    border: 1px solid var(--border-strong);
+    border-radius: 12px;
+    padding: 1.5rem;
+    width: 100%; max-width: 30rem;
+    box-shadow: 0 12px 40px rgba(0, 0, 0, .18);
+}
+.modal-card h2 { margin: 0 0 .5rem; }
+.modal-message { margin: 0 0 1.25rem; }
+.modal-actions { display: flex; justify-content: flex-end; gap: .6rem; }
+
+/* small inline delete button (table rows) */
+.btn-icon-danger {
+    padding: .25rem .6rem; font: inherit; font-size: .85rem;
+    background: transparent; border: 1px solid #e7c4ba; color: var(--danger);
+    border-radius: 8px; cursor: pointer;
+    transition: background .15s;
+}
+.btn-icon-danger:hover { background: #f7eae6; }
+.col-actions { width: 1%; white-space: nowrap; text-align: right; }
+
 /* GitHub link/button */
 .gh-link, .btn-github { display: inline-flex; align-items: center; gap: .5rem; font-weight: 600; }
 .gh-icon { display: inline-block; vertical-align: middle; }

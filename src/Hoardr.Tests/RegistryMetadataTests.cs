@@ -219,4 +219,60 @@ public class RegistryMetadataTests
         Assert.Null(meta.GetTag("app", "latest"));
         Assert.Equal(0, meta.GetManifest("app", m)!.RefCount);
     }
+
+    // --------------------------------------------------------------- Delete repo
+
+    [Fact]
+    public void DeleteRepo_Removes_Tags_Manifests_And_Blob_Links()
+    {
+        var (db, meta) = New();
+        using var _ = db;
+        var config = D("config");
+        var layer = D("layer");
+        meta.EnsureBlobUploaded("app", config, 10);
+        meta.EnsureBlobUploaded("app", layer, 20);
+        var manifest = D("manifest");
+        meta.PutManifest("app", manifest, "mt",
+        [
+            new ManifestChild(config, ManifestChildKind.Blob),
+            new ManifestChild(layer, ManifestChildKind.Blob),
+        ]);
+        meta.PutTag("app", "latest", manifest);
+
+        meta.DeleteRepo("app");
+
+        Assert.DoesNotContain("app", meta.ListRepos());
+        Assert.Empty(meta.ListTags("app"));
+        Assert.Null(meta.GetManifest("app", manifest));
+        Assert.False(meta.BlobInRepo("app", config));
+        Assert.False(meta.BlobInRepo("app", layer));
+        // Child blob refs released so GC can reclaim the bytes later.
+        Assert.Equal(0, meta.GetBlob(config)!.RefCount);
+        Assert.Equal(0, meta.GetBlob(layer)!.RefCount);
+    }
+
+    [Fact]
+    public void DeleteRepo_Leaves_Other_Repos_Intact()
+    {
+        var (db, meta) = New();
+        using var _ = db;
+        var shared = D("shared-layer");
+        meta.EnsureBlobUploaded("app", shared, 50);
+        meta.EnsureBlobUploaded("web", shared, 50);
+        var mApp = D("m-app");
+        var mWeb = D("m-web");
+        meta.PutManifest("app", mApp, "mt", [new ManifestChild(shared, ManifestChildKind.Blob)]);
+        meta.PutManifest("web", mWeb, "mt", [new ManifestChild(shared, ManifestChildKind.Blob)]);
+        meta.PutTag("app", "1.0", mApp);
+        meta.PutTag("web", "1.0", mWeb);
+
+        meta.DeleteRepo("app");
+
+        Assert.DoesNotContain("app", meta.ListRepos());
+        Assert.Contains("web", meta.ListRepos());
+        Assert.True(meta.BlobInRepo("web", shared));
+        Assert.NotNull(meta.GetManifest("web", mWeb));
+        // shared blob still held by web's manifest (was 2, now 1)
+        Assert.Equal(1, meta.GetBlob(shared)!.RefCount);
+    }
 }

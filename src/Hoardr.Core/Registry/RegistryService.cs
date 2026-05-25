@@ -146,4 +146,7 @@ public sealed class RegistryService(BlobStore blobs, RegistryMetadata meta, Uplo
     }
 
     public IReadOnlyList<TagRecord> ListTags(string repo) => meta.ListTags(repo);
+
+    /// <summary>Deletes an entire repo (all tags, manifests and blob links). Bytes are reclaimed by GC.</summary>
+    public void DeleteRepo(string repo) => meta.DeleteRepo(repo);
 }

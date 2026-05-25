@@ -350,4 +350,26 @@ public sealed class RegistryMetadata(ISproutDatabase db, TimeProvider? time = nu
             db.Exec($"delete manifests where _id = {manifest.Id}");
         }
     }
+
+    /// <summary>
+    /// Removes an entire repo: every tag (releasing manifest refs), every manifest (releasing its
+    /// child blob/manifest refs) and every blob link. Blob and manifest bytes are reclaimed later by
+    /// GC once ref_count hits 0 + grace. Afterwards the repo no longer appears in <see cref="ListRepos"/>.
+    /// Other repos that share blobs keep them (their own manifest refs are untouched).
+    /// </summary>
+    public void DeleteRepo(string repo)
+    {
+        // Each sub-call takes _gate individually — safe in this single-writer process.
+        foreach (var tag in ListTags(repo))
+            DeleteTag(repo, tag.Name);
+
+        var manifests = db.Exec($"get manifests where repo = {Q(repo)}").Data;
+        if (manifests is { Count: > 0 })
+            foreach (var row in manifests)
+                if (Digest.TryParse(row.Str("digest"), out var d))
+                    DeleteManifest(repo, d);
+
+        lock (_gate)
+            db.Exec($"delete repo_blobs where repo = {Q(repo)}");
+    }
 }

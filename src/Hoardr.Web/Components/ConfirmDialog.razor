@@ -1,0 +1,46 @@
+@* Reusable confirmation modal. Call ShowAsync(...) and await the bool result. *@
+@if (_visible)
+{
+    <div class="modal-backdrop" @onclick="Cancel">
+        <div class="modal-card" @onclick:stopPropagation="true">
+            <h2>@_title</h2>
+            <p class="muted modal-message">@_message</p>
+            <div class="modal-actions">
+                <button class="btn btn-ghost" @onclick="Cancel">Cancel</button>
+                <button class="btn btn-danger" @onclick="Confirm">@_confirmLabel</button>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private bool _visible;
+    private string _title = "Are you sure?";
+    private string _message = "";
+    private string _confirmLabel = "Delete";
+    private TaskCompletionSource<bool>? _tcs;
+
+    /// <summary>Shows the dialog and resolves to true (confirmed) or false (cancelled/dismissed).</summary>
+    public Task<bool> ShowAsync(string message, string title = "Are you sure?", string confirmLabel = "Delete")
+    {
+        _message = message;
+        _title = title;
+        _confirmLabel = confirmLabel;
+        _visible = true;
+        _tcs = new TaskCompletionSource<bool>();
+        StateHasChanged();
+        return _tcs.Task;
+    }
+
+    private void Confirm()
+    {
+        _visible = false;
+        _tcs?.TrySetResult(true);
+    }
+
+    private void Cancel()
+    {
+        _visible = false;
+        _tcs?.TrySetResult(false);
+    }
+}
