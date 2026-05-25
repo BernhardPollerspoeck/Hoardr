@@ -3,6 +3,7 @@ using System.Text.Json;
 using Hoardr.Core;
 using Hoardr.Core.Auth;
 using Hoardr.Core.Registry;
+using Microsoft.AspNetCore.Http.Features;
 
 namespace Hoardr.Web.Oci;
 
@@ -27,6 +28,12 @@ public static class OciRegistryEndpoints
         var identity = auth.Authenticate(ctx.Request.Headers.Authorization.ToString());
 
         var log = ctx.RequestServices.GetRequiredService<ILoggerFactory>().CreateLogger("Hoardr.Oci");
+
+        // Blob uploads are unbounded — lift Kestrel's default ~30 MB request-body cap for the
+        // registry API so docker can push large layers. (The Blazor UI keeps the default limit.)
+        // Must run before the body is read; /v2 has no body-reading middleware ahead of this.
+        if (ctx.Features.Get<IHttpMaxRequestBodySizeFeature>() is { IsReadOnly: false } bodySize)
+            bodySize.MaxRequestBodySize = null;
 
         path = path ?? "";
 
