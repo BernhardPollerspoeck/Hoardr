@@ -5,6 +5,7 @@
 @inject RegistryMetadata Meta
 @inject RegistryService Registry
 @inject AccountService Accounts
+@inject RepoSettingsService RepoSettings
 @inject NavigationManager Nav
 
 <PageTitle>Hoardr · @Name</PageTitle>
@@ -56,8 +57,15 @@ else
                 <tbody>
                     @foreach (var t in _tags)
                     {
+                        var isLatest = t.Name == "latest";
                         <tr>
-                            <td><span class="tag-pill">@t.Name</span></td>
+                            <td>
+                                <span class="tag-pill@(isLatest ? " tag-latest" : "")">@t.Name</span>
+                                @if (isLatest)
+                                {
+                                    <span class="tag-hint" title="@LatestHint">@(_autoLatest ? "auto" : "pointer")</span>
+                                }
+                            </td>
                             <td class="mono muted">@Short(t.Digest)</td>
                             <td>@Humanize.Bytes(t.Size)</td>
                             <td class="muted">@Humanize.Ago(t.PushedAt)</td>
@@ -83,11 +91,16 @@ else
 
     private bool _allowed;
     private bool _canDelete;
+    private bool _autoLatest;
     private RepoStats _stats = new("", 0, 0);
     private List<TagView> _tags = [];
     private ConfirmDialog _confirm = default!;
 
     private record TagView(string Name, Digest Digest, long Size, DateTime PushedAt);
+
+    private string LatestHint => _autoLatest
+        ? "Auto-latest is on: every push moves \"latest\" onto the newest image."
+        : "Pinned to the top — the \"latest\" tag.";
 
     protected override async Task OnInitializedAsync()
     {
@@ -106,9 +119,12 @@ else
     private void Load()
     {
         _stats = Meta.GetRepoStats(Name);
+        _autoLatest = RepoSettings.GetAutoLatest(Name);
+        // "latest" is always pinned to the top; everything else falls back to newest-first.
         _tags = [.. Meta.ListTags(Name)
-            .OrderByDescending(t => t.PushedAt)
-            .Select(t => new TagView(t.Name, t.ManifestDigest, ManifestSize(t.ManifestDigest), t.PushedAt))];
+            .Select(t => new TagView(t.Name, t.ManifestDigest, ManifestSize(t.ManifestDigest), t.PushedAt))
+            .OrderByDescending(t => t.Name == "latest")
+            .ThenByDescending(t => t.PushedAt)];
     }
 
     private async Task DeleteTagAsync(string tagName)

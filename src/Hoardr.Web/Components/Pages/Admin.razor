@@ -69,8 +69,14 @@
                         <option value="@repo">@repo</option>
                     }
                 </select>
-                <label class="check"><input type="checkbox" @bind="_permPull" /> pull</label>
-                <label class="check"><input type="checkbox" @bind="_permPush" /> push</label>
+                <label class="check" title="@(_permPush ? "Required — push includes pull (a push reads existing layers first)" : "Allow pulling images")">
+                    <input type="checkbox" checked="@(_permPull || _permPush)" disabled="@_permPush"
+                           @onchange="e => _permPull = (bool)e.Value!" /> pull
+                </label>
+                <label class="check" title="Push includes pull — docker HEADs existing layers before uploading">
+                    <input type="checkbox" checked="@_permPush"
+                           @onchange="e => OnPushChanged((bool)e.Value!)" /> push
+                </label>
                 <label class="check"><input type="checkbox" @bind="_permDelete" /> delete</label>
                 <button class="btn btn-primary" @onclick="SetPermission">Set</button>
             </div>
@@ -231,10 +237,18 @@
         _permDelete = false;
     }
 
+    // Push implies pull: a docker push HEADs existing layers (a read) before uploading,
+    // so a push-only grant can't actually push. Forcing pull on keeps the checkbox honest.
+    private void OnPushChanged(bool enabled)
+    {
+        _permPush = enabled;
+        if (enabled) _permPull = true;
+    }
+
     private void SetPermission()
     {
         if (_selected is null || string.IsNullOrWhiteSpace(_permRepo)) return;
-        Accounts.SetPermission(_selected.Id, _permRepo.Trim(), _permPull, _permPush, _permDelete);
+        Accounts.SetPermission(_selected.Id, _permRepo.Trim(), _permPull || _permPush, _permPush, _permDelete);
         _permRepo = "";
     }
 

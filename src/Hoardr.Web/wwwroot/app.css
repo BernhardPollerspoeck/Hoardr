@@ -146,6 +146,12 @@ h3 { font-size: 1rem; font-weight: 600; margin: 0 0 .75rem; }
     background: var(--green-soft); color: var(--green-dark);
     padding: .15rem .55rem; border-radius: 6px; font-size: .8rem;
 }
+.tag-latest { background: var(--green-dark); color: #fff; }
+.tag-hint {
+    margin-left: .4rem; cursor: help;
+    color: var(--muted); font-size: .72rem; text-transform: uppercase; letter-spacing: .04em;
+    border: 1px dashed var(--border-strong); border-radius: 5px; padding: .05rem .35rem;
+}
 
 /* ---------------------------------------------------------------- admin */
 .admin-section { margin-bottom: 1.5rem; }

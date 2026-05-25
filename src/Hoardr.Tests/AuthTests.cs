@@ -118,6 +118,21 @@ public class AccountServiceTests
     }
 
     [Fact]
+    public void Push_Permission_Implies_Pull()
+    {
+        // A docker push HEADs existing layers (a read) before uploading, so a push grant
+        // without pull can't actually push. SetPermission normalizes push to include pull.
+        using var db = new TestDatabase();
+        var svc = new AccountService(db.Db);
+        var ci = svc.CreateAccount("ci", "pw")!;
+
+        svc.SetPermission(ci.Id, "app", canPull: false, canPush: true);
+
+        Assert.True(svc.CanPush(ci.Id, "app"));
+        Assert.True(svc.CanPull(ci.Id, "app"));
+    }
+
+    [Fact]
     public void Delete_Permission_Defaults_Off_And_Is_Settable()
     {
         using var db = new TestDatabase();

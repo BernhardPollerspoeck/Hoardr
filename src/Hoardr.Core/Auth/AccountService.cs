@@ -86,6 +86,9 @@ public sealed class AccountService(ISproutDatabase db, TimeProvider? time = null
     /// <summary>Sets (creates or updates) an account's permission for a repo.</summary>
     public void SetPermission(ulong accountId, string repo, bool canPull, bool canPush, bool canDelete = false)
     {
+        // Push implies pull: a push HEADs existing layers (a read) before uploading, so a
+        // push grant without pull can't actually push. Normalize here so it can't be persisted.
+        canPull = canPull || canPush;
         var flags = $"can_pull: {Lower(canPull)}, can_push: {Lower(canPush)}, can_delete: {Lower(canDelete)}";
         var existing = db.Exec($"get repo_permissions where account_id = {accountId} and repo = {Q(repo)}").Data;
         if (existing is { Count: > 0 })
