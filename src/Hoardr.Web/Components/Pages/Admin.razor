@@ -6,7 +6,6 @@
 @inject AccountService Accounts
 @inject RegistryMetadata Meta
 @inject RetentionService Retention
-@inject RepoSettingsService RepoSettings
 @inject NtfyService Ntfy
 @inject DiskSpaceMonitor Disk
 
@@ -88,59 +87,61 @@
 <section class="card admin-section">
     <h2>Tag retention</h2>
     <p class="muted">
-        Global: keep at least <strong>@Retention.Default.KeepMin</strong> newest tags,
+        Global default: keep at least <strong>@Retention.Default.KeepMin</strong> newest tags,
         delete tags older than <strong>@Retention.Default.MaxAgeDays</strong> days beyond that.
-        Overridable per repository.
+        Only repositories that override the default are listed below. Public-pull and auto-latest
+        are configured on each repository's own page.
     </p>
 
-    <table class="data-table">
-        <thead><tr><th>Repository</th><th title="Allow anonymous pull (open-source images)">Public&nbsp;pull</th><th>Auto&nbsp;latest</th><th>keep_min</th><th>max_age (days)</th><th>Source</th><th></th></tr></thead>
-        <tbody>
-            @foreach (var repo in _repos)
-            {
-                var ov = Retention.GetOverride(repo);
-                var eff = Retention.GetEffective(repo);
-                var autoLatest = RepoSettings.GetAutoLatest(repo);
-                var publicRead = RepoSettings.GetPublicRead(repo);
-                <tr>
-                    <td>@repo</td>
-                    <td>
-                        <label class="check" title="Allow anyone to pull this repo without logging in">
-                            <input type="checkbox" checked="@publicRead"
-                                   @onchange="e => TogglePublic(repo, (bool)e.Value!)" />
-                        </label>
-                    </td>
-                    <td>
-                        <label class="check" title="Keep 'latest' on the most recently pushed tag">
-                            <input type="checkbox" checked="@autoLatest"
-                                   @onchange="e => ToggleAutoLatest(repo, (bool)e.Value!)" />
-                        </label>
-                    </td>
-                    <td>@eff.KeepMin</td>
-                    <td>@eff.MaxAgeDays</td>
-                    <td>@(ov is null ? "Default" : "Override")</td>
-                    <td class="right">
-                        <button class="btn btn-ghost" @onclick="() => EditRetention(repo, eff)">Edit</button>
-                        @if (ov is not null)
-                        {
-                            <button class="btn btn-danger" @onclick="() => RemoveOverride(repo)">Remove override</button>
-                        }
-                    </td>
-                </tr>
-            }
-        </tbody>
-    </table>
+    <div class="inline-form">
+        @if (_overrideEditing)
+        {
+            <strong class="form-repo">@_overrideRepo</strong>
+        }
+        else
+        {
+            <select class="input" @bind="_overrideRepo">
+                <option value="">— select repository —</option>
+                @foreach (var repo in ReposWithoutOverride())
+                {
+                    <option value="@repo">@repo</option>
+                }
+            </select>
+        }
+        <label class="check">keep_min <input class="input small" type="number" min="0" @bind="_keepMin" /></label>
+        <label class="check">max_age (days) <input class="input small" type="number" min="0" @bind="_maxAge" /></label>
+        <button class="btn btn-primary" @onclick="SaveOverride">@(_overrideEditing ? "Save" : "Add override")</button>
+        @if (_overrideEditing)
+        {
+            <button class="btn btn-ghost" @onclick="ResetForm">Cancel</button>
+        }
+        @if (_retentionMsg is not null) { <span class="form-msg">@_retentionMsg</span> }
+    </div>
 
-    @if (_retentionRepo is not null)
+    @{ var overrides = Retention.ListOverrides(); }
+    @if (overrides.Count == 0)
     {
-        <div class="subpanel">
-            <h3>Override for <em>@_retentionRepo</em></h3>
-            <div class="inline-form">
-                <label class="check">keep_min <input class="input small" type="number" min="0" @bind="_keepMin" /></label>
-                <label class="check">max_age (days) <input class="input small" type="number" min="0" @bind="_maxAge" /></label>
-                <button class="btn btn-primary" @onclick="SaveOverride">Save</button>
-            </div>
-        </div>
+        <p class="muted">No overrides — every repository uses the global default.</p>
+    }
+    else
+    {
+        <table class="data-table">
+            <thead><tr><th>Repository</th><th>keep_min</th><th>max_age (days)</th><th></th></tr></thead>
+            <tbody>
+                @foreach (var (repo, policy) in overrides)
+                {
+                    <tr>
+                        <td>@repo</td>
+                        <td>@policy.KeepMin</td>
+                        <td>@policy.MaxAgeDays</td>
+                        <td class="right">
+                            <button class="btn btn-ghost" @onclick="() => EditOverride(repo, policy)">Edit</button>
+                            <button class="btn btn-danger" @onclick="() => ResetOverride(repo)">Reset to default</button>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
     }
 </section>
 
@@ -182,9 +183,11 @@
     private bool _permPush;
     private bool _permDelete;
 
-    private string? _retentionRepo;
+    private string _overrideRepo = "";
+    private bool _overrideEditing;
     private int _keepMin;
     private int _maxAge;
+    private string? _retentionMsg;
 
     private NtfyConfig _ntfy = NtfyConfig.Default;
     private string? _ntfyMsg;
@@ -192,6 +195,7 @@
     protected override void OnInitialized()
     {
         Reload();
+        ResetForm(); // seed keep_min/max_age inputs with the global default
         _ntfy = Ntfy.GetConfig();
     }
 
@@ -252,27 +256,48 @@
         _permRepo = "";
     }
 
-    // --- retention ---
-    private void EditRetention(string repo, RetentionPolicy eff)
+    // --- retention overrides ---
+    private IEnumerable<string> ReposWithoutOverride()
     {
-        _retentionRepo = repo;
-        _keepMin = eff.KeepMin;
-        _maxAge = eff.MaxAgeDays;
+        var overridden = Retention.ListOverrides().Select(o => o.Repo).ToHashSet();
+        return _repos.Where(r => !overridden.Contains(r));
+    }
+
+    private void EditOverride(string repo, RetentionPolicy policy)
+    {
+        _overrideRepo = repo;
+        _overrideEditing = true;
+        _keepMin = policy.KeepMin;
+        _maxAge = policy.MaxAgeDays;
+        _retentionMsg = null;
     }
 
     private void SaveOverride()
     {
-        if (_retentionRepo is null) return;
-        Retention.SetOverride(_retentionRepo, _keepMin, _maxAge);
-        _retentionRepo = null;
+        if (string.IsNullOrWhiteSpace(_overrideRepo))
+        {
+            _retentionMsg = "Select a repository.";
+            return;
+        }
+        Retention.SetOverride(_overrideRepo.Trim(), _keepMin, _maxAge);
+        _retentionMsg = $"Override saved for '{_overrideRepo.Trim()}'.";
+        ResetForm();
     }
 
-    private void RemoveOverride(string repo) => Retention.RemoveOverride(repo);
+    private void ResetOverride(string repo)
+    {
+        Retention.RemoveOverride(repo);
+        if (_overrideRepo == repo) ResetForm();
+        _retentionMsg = $"'{repo}' reset to the global default.";
+    }
 
-    // --- per-repo settings ---
-    private void ToggleAutoLatest(string repo, bool enabled) => RepoSettings.SetAutoLatest(repo, enabled);
-
-    private void TogglePublic(string repo, bool enabled) => RepoSettings.SetPublicRead(repo, enabled);
+    private void ResetForm()
+    {
+        _overrideRepo = "";
+        _overrideEditing = false;
+        _keepMin = Retention.Default.KeepMin;
+        _maxAge = Retention.Default.MaxAgeDays;
+    }
 
     // --- ntfy ---
     private void SaveNtfy()

@@ -77,6 +77,56 @@ public class AutoLatestTests
     }
 
     [Fact]
+    public async Task Enabled_ListTags_Includes_Virtual_Latest_Pointing_At_Newest()
+    {
+        using var db = new TestDatabase();
+        using var blobs = new TempBlobStore();
+        var reg = NewService(db, blobs, out var settings);
+        const string repo = "team/app";
+        settings.SetAutoLatest(repo, true);
+
+        await reg.PutManifestAsync(repo, "1.0.0", Manifest("v1"), null);
+        var d2 = await reg.PutManifestAsync(repo, "1.1.0", Manifest("v2"), null);
+
+        var tags = reg.ListTags(repo);
+        var latest = Assert.Single(tags, t => t.Name == "latest");
+        Assert.Equal(0UL, latest.Id);                 // virtual, not a stored tag
+        Assert.Equal(d2, latest.ManifestDigest);      // points at the newest push
+    }
+
+    [Fact]
+    public async Task Disabled_ListTags_Has_No_Latest()
+    {
+        using var db = new TestDatabase();
+        using var blobs = new TempBlobStore();
+        var reg = NewService(db, blobs, out _);
+        const string repo = "team/app";
+
+        await reg.PutManifestAsync(repo, "1.0.0", Manifest("v1"), null);
+
+        Assert.DoesNotContain(reg.ListTags(repo), t => t.Name == "latest");
+    }
+
+    [Fact]
+    public async Task Real_Latest_Tag_Takes_Precedence_Over_Virtual()
+    {
+        using var db = new TestDatabase();
+        using var blobs = new TempBlobStore();
+        var reg = NewService(db, blobs, out var settings);
+        const string repo = "team/app";
+        settings.SetAutoLatest(repo, true);
+
+        var dPinned = await reg.PutManifestAsync(repo, "latest", Manifest("pinned"), null);  // manual latest
+        await reg.PutManifestAsync(repo, "2.0.0", Manifest("newer"), null);                  // newer real tag
+
+        // The stored `latest` wins over the computed one…
+        Assert.Equal(dPinned, reg.ResolveManifest(repo, "latest")!.Digest);
+        // …and is listed once, as a real tag (Id != 0).
+        var latest = Assert.Single(reg.ListTags(repo), t => t.Name == "latest");
+        Assert.NotEqual(0UL, latest.Id);
+    }
+
+    [Fact]
     public async Task Digest_Push_Does_Not_Trigger_Latest()
     {
         using var db = new TestDatabase();

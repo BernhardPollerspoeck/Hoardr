@@ -155,6 +155,8 @@ h3 { font-size: 1rem; font-weight: 600; margin: 0 0 .75rem; }
 
 /* ---------------------------------------------------------------- admin */
 .admin-section { margin-bottom: 1.5rem; }
+.repo-settings { display: flex; flex-wrap: wrap; gap: 1.5rem; align-items: center; margin-bottom: 1.2rem; }
+.form-repo { padding: .5rem .2rem; color: var(--green-dark); }
 .subpanel { margin-top: 1.2rem; padding-top: 1.2rem; border-top: 1px dashed var(--border-strong); }
 
 .inline-form { display: flex; flex-wrap: wrap; gap: .6rem; align-items: center; margin-bottom: 1.2rem; }

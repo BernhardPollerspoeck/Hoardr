@@ -34,6 +34,19 @@ else
         }
     </div>
 
+    @if (_isMaster)
+    {
+        <div class="card repo-settings">
+            <label class="check" title="Allow anyone to pull this repository without logging in">
+                <input type="checkbox" checked="@_publicRead" @onchange="e => TogglePublic((bool)e.Value!)" /> Public pull
+            </label>
+            <label class="check" title="Keep a virtual 'latest' pointing at the most recently pushed tag">
+                <input type="checkbox" checked="@_autoLatest" @onchange="e => ToggleAutoLatest((bool)e.Value!)" /> Auto-latest
+            </label>
+            @if (_settingsMsg is not null) { <span class="form-msg">@_settingsMsg</span> }
+        </div>
+    }
+
     @if (_tags.Count == 0)
     {
         <div class="empty-state">
@@ -72,7 +85,10 @@ else
                             @if (_canDelete)
                             {
                                 <td class="col-actions">
-                                    <button class="btn-icon-danger" title="Delete tag" @onclick="() => DeleteTagAsync(t.Name)">Delete</button>
+                                    @if (t.Id != 0)
+                                    {
+                                        <button class="btn-icon-danger" title="Delete tag" @onclick="() => DeleteTagAsync(t.Name)">Delete</button>
+                                    }
                                 </td>
                             }
                         </tr>
@@ -91,12 +107,16 @@ else
 
     private bool _allowed;
     private bool _canDelete;
+    private bool _isMaster;
     private bool _autoLatest;
+    private bool _publicRead;
+    private string? _settingsMsg;
     private RepoStats _stats = new("", 0, 0);
     private List<TagView> _tags = [];
     private ConfirmDialog _confirm = default!;
 
-    private record TagView(string Name, Digest Digest, long Size, DateTime PushedAt);
+    // Id 0 marks the virtual "latest" entry from Registry.ListTags (computed, not a stored tag).
+    private record TagView(ulong Id, string Name, Digest Digest, long Size, DateTime PushedAt);
 
     private string LatestHint => _autoLatest
         ? "Auto-latest is on: every push moves \"latest\" onto the newest image."
@@ -105,11 +125,11 @@ else
     protected override async Task OnInitializedAsync()
     {
         var user = (await AuthState).User;
-        var isMaster = user.IsInRole("master");
+        _isMaster = user.IsInRole("master");
         var accountId = ulong.Parse(user.FindFirst("account_id")?.Value ?? "0");
 
-        _allowed = isMaster || Accounts.CanPull(accountId, Name);
-        _canDelete = isMaster || Accounts.CanDelete(accountId, Name);
+        _allowed = _isMaster || Accounts.CanPull(accountId, Name);
+        _canDelete = _isMaster || Accounts.CanDelete(accountId, Name);
         if (!_allowed)
             return;
 
@@ -120,11 +140,28 @@ else
     {
         _stats = Meta.GetRepoStats(Name);
         _autoLatest = RepoSettings.GetAutoLatest(Name);
+        _publicRead = RepoSettings.GetPublicRead(Name);
+        // Registry.ListTags injects a virtual "latest" (Id 0) when auto-latest is on.
         // "latest" is always pinned to the top; everything else falls back to newest-first.
-        _tags = [.. Meta.ListTags(Name)
-            .Select(t => new TagView(t.Name, t.ManifestDigest, ManifestSize(t.ManifestDigest), t.PushedAt))
+        _tags = [.. Registry.ListTags(Name)
+            .Select(t => new TagView(t.Id, t.Name, t.ManifestDigest, ManifestSize(t.ManifestDigest), t.PushedAt))
             .OrderByDescending(t => t.Name == "latest")
             .ThenByDescending(t => t.PushedAt)];
+    }
+
+    // Per-repo settings (master only). Persisted immediately on toggle, like the old admin table.
+    private void TogglePublic(bool enabled)
+    {
+        RepoSettings.SetPublicRead(Name, enabled);
+        _publicRead = enabled;
+        _settingsMsg = $"Public pull {(enabled ? "enabled" : "disabled")}.";
+    }
+
+    private void ToggleAutoLatest(bool enabled)
+    {
+        RepoSettings.SetAutoLatest(Name, enabled);
+        _settingsMsg = $"Auto-latest {(enabled ? "enabled" : "disabled")}.";
+        Load(); // virtual "latest" appears/disappears in the tag list
     }
 
     private async Task DeleteTagAsync(string tagName)

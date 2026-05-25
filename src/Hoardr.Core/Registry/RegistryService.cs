@@ -91,16 +91,25 @@ public sealed class RegistryService(BlobStore blobs, RegistryMetadata meta, Uplo
         meta.PutManifest(repo, digest, info.MediaType, info.Children);
 
         if (!Digest.TryParse(reference, out _)) // reference is a tag, not a digest
-        {
             meta.PutTag(repo, reference, digest);
-
-            // auto-latest: keep `latest` pointing at the most recently pushed tag
-            if (reference != "latest" && settings.GetAutoLatest(repo))
-                meta.PutTag(repo, "latest", digest);
-        }
+        // Note: `latest` is NOT materialized here. When auto-latest is on it is resolved/listed
+        // virtually as "the newest tag" (see NewestTag / ResolveManifest / ListTags), so it can't
+        // drift, needs no backfill, and doesn't consume a retention slot.
 
         return digest;
     }
+
+    /// <summary>
+    /// The tag that a virtual <c>latest</c> resolves to when auto-latest is enabled: the most
+    /// recently pushed real tag (excluding any literal <c>latest</c>). Null if the repo has no tags
+    /// or auto-latest is off.
+    /// </summary>
+    private TagRecord? NewestTag(string repo)
+        => settings.GetAutoLatest(repo)
+            ? meta.ListTags(repo).Where(t => t.Name != "latest")
+                .OrderByDescending(t => t.PushedAt).ThenByDescending(t => t.Id)  // Id breaks pushed_at ties
+                .FirstOrDefault()
+            : null;
 
     public ManifestServeInfo? ResolveManifest(string repo, string reference)
     {
@@ -109,6 +118,9 @@ public sealed class RegistryService(BlobStore blobs, RegistryMetadata meta, Uplo
             digest = parsed;
         else if (meta.GetTag(repo, reference) is { } tag)
             digest = tag.ManifestDigest;
+        // Virtual `latest`: only when no real `latest` tag exists (a manual push wins).
+        else if (reference == "latest" && NewestTag(repo) is { } newest)
+            digest = newest.ManifestDigest;
         else
             return null;
 
@@ -145,7 +157,18 @@ public sealed class RegistryService(BlobStore blobs, RegistryMetadata meta, Uplo
         return true;
     }
 
-    public IReadOnlyList<TagRecord> ListTags(string repo) => meta.ListTags(repo);
+    /// <summary>
+    /// Lists a repo's tags, prepending a virtual <c>latest</c> (pointing at the newest tag) when
+    /// auto-latest is on and no real <c>latest</c> exists. The virtual entry carries Id 0 so callers
+    /// can tell it apart from a stored tag.
+    /// </summary>
+    public IReadOnlyList<TagRecord> ListTags(string repo)
+    {
+        var tags = meta.ListTags(repo);
+        if (tags.Any(t => t.Name == "latest") || NewestTag(repo) is not { } newest)
+            return tags;
+        return [newest with { Id = 0, Name = "latest" }, .. tags];
+    }
 
     /// <summary>Deletes an entire repo (all tags, manifests and blob links). Bytes are reclaimed by GC.</summary>
     public void DeleteRepo(string repo) => meta.DeleteRepo(repo);
