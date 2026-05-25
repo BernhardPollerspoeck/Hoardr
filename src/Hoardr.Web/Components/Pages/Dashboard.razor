@@ -9,7 +9,13 @@
 
 <div class="page-head">
     <div>
-        <h1>Repositories</h1>
+        <div class="title-row">
+            <h1>Repositories</h1>
+            <button class="btn btn-ghost btn-sm btn-refresh" @onclick="LoadReposAsync" disabled="@_loading"
+                    title="Refresh" aria-label="Refresh repositories">
+                <span class="refresh-icon @(_loading ? "spinning" : null)">⟳</span>
+            </button>
+        </div>
         <p class="muted">@(_repos.Count) repositor@(_repos.Count == 1 ? "y" : "ies") visible</p>
     </div>
 </div>
@@ -50,22 +56,33 @@ else
     [CascadingParameter] private Task<AuthenticationState> AuthState { get; set; } = default!;
 
     private List<RepoStats> _repos = [];
+    private bool _loading;
 
-    protected override async Task OnInitializedAsync()
+    protected override Task OnInitializedAsync() => LoadReposAsync();
+
+    private async Task LoadReposAsync()
     {
-        var user = (await AuthState).User;
-
-        IEnumerable<string> repoNames;
-        if (user.IsInRole("master"))
+        _loading = true;
+        try
         {
-            repoNames = Meta.ListRepos();
-        }
-        else
-        {
-            var accountId = ulong.Parse(user.FindFirst("account_id")?.Value ?? "0");
-            repoNames = Accounts.ListPermissions(accountId).Where(p => p.CanPull).Select(p => p.Repo);
-        }
+            var user = (await AuthState).User;
 
-        _repos = [.. repoNames.Select(Meta.GetRepoStats)];
+            IEnumerable<string> repoNames;
+            if (user.IsInRole("master"))
+            {
+                repoNames = Meta.ListRepos();
+            }
+            else
+            {
+                var accountId = ulong.Parse(user.FindFirst("account_id")?.Value ?? "0");
+                repoNames = Accounts.ListPermissions(accountId).Where(p => p.CanPull).Select(p => p.Repo);
+            }
+
+            _repos = [.. repoNames.Select(Meta.GetRepoStats)];
+        }
+        finally
+        {
+            _loading = false;
+        }
     }
 }

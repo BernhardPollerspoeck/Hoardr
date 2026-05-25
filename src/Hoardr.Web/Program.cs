@@ -14,10 +14,32 @@ using System.Security.Cryptography.X509Certificates;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.DataProtection.KeyManagement;
+using Serilog;
+using Serilog.Events;
 using SproutDB.Core;
 using SproutDB.Core.DependencyInjection;
 
 var builder = WebApplication.CreateBuilder(args);
+
+// Structured logging: console (Docker stdout) + a size-capped, self-rotating file so logs never
+// fill the disk. Files live under {DataRoot}/logs, each capped at 10 MB, max 7 files retained
+// (~70 MB ceiling). Tune levels in appsettings under "Serilog" if needed.
+var logDirectory = Path.Combine(
+    builder.Configuration["Hoardr:DataRoot"] ?? Path.Combine(builder.Environment.ContentRootPath, "data"),
+    "logs");
+builder.Host.UseSerilog((context, loggerConfig) => loggerConfig
+    .ReadFrom.Configuration(context.Configuration)
+    .MinimumLevel.Information()
+    .MinimumLevel.Override("Microsoft.AspNetCore", LogEventLevel.Warning)
+    .Enrich.FromLogContext()
+    .WriteTo.Console()
+    .WriteTo.File(
+        Path.Combine(logDirectory, "hoardr-.log"),
+        rollingInterval: RollingInterval.Day,
+        fileSizeLimitBytes: 10L * 1024 * 1024,
+        rollOnFileSizeLimit: true,
+        retainedFileCountLimit: 7,
+        shared: true));
 
 // Optional Hoardr-managed port + HTTPS. If neither is configured, ASP.NET defaults apply
 // (ASPNETCORE_HTTP_PORTS / launchSettings) — so the simple case stays zero-config.
@@ -114,6 +136,9 @@ builder.Services.AddSingleton(sp => new DiskSpaceMonitor(
 builder.Services.AddHostedService<DiskMonitorService>();
 
 var app = builder.Build();
+
+// One structured log line per HTTP request (method, path, status, elapsed) — covers all /v2 OCI calls.
+app.UseSerilogRequestLogging();
 
 // Configure the HTTP request pipeline.
 if (!app.Environment.IsDevelopment())

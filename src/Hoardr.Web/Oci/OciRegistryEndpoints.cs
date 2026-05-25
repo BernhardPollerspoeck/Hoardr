@@ -26,6 +26,8 @@ public static class OciRegistryEndpoints
         // Identity may be null (anonymous) — public repos allow anonymous reads.
         var identity = auth.Authenticate(ctx.Request.Headers.Authorization.ToString());
 
+        var log = ctx.RequestServices.GetRequiredService<ILoggerFactory>().CreateLogger("Hoardr.Oci");
+
         path = path ?? "";
 
         // GET /v2/ — API probe. Validate creds if provided (so `docker login` fails on bad
@@ -35,6 +37,7 @@ public static class OciRegistryEndpoints
             var credentialsProvided = !string.IsNullOrEmpty(ctx.Request.Headers.Authorization);
             if (credentialsProvided && identity is null)
             {
+                log.LogWarning("OCI /v2 probe: rejected invalid credentials for user '{User}'", AuthUser(ctx));
                 await WriteError(ctx, 401, "UNAUTHORIZED", "invalid credentials");
                 return;
             }
@@ -59,14 +62,14 @@ public static class OciRegistryEndpoints
         var mi = path.LastIndexOf("/manifests/", StringComparison.Ordinal);
         if (mi >= 0)
         {
-            await HandleManifest(ctx, reg, auth, accounts, identity, path[..mi], path[(mi + "/manifests/".Length)..]);
+            await HandleManifest(ctx, reg, auth, accounts, identity, path[..mi], path[(mi + "/manifests/".Length)..], log);
             return;
         }
 
         var ui = path.LastIndexOf("/blobs/uploads", StringComparison.Ordinal);
         if (ui >= 0)
         {
-            await HandleUpload(ctx, reg, auth, accounts, identity, path[..ui], path[(ui + "/blobs/uploads".Length)..].Trim('/'));
+            await HandleUpload(ctx, reg, auth, accounts, identity, path[..ui], path[(ui + "/blobs/uploads".Length)..].Trim('/'), log);
             return;
         }
 
@@ -167,11 +170,18 @@ public static class OciRegistryEndpoints
 
     // ------------------------------------------------------------------- Uploads
 
-    private static async Task HandleUpload(HttpContext ctx, RegistryService reg, Authenticator auth, AccountService accounts, Identity? identity, string name, string uuid)
+    private static async Task HandleUpload(HttpContext ctx, RegistryService reg, Authenticator auth, AccountService accounts, Identity? identity, string name, string uuid, ILogger log)
     {
-        if (identity is null) { await WriteError(ctx, 401, "UNAUTHORIZED", "authentication required"); return; }
+        if (identity is null)
+        {
+            log.LogWarning("Push to '{Repo}' denied: no credentials provided", name);
+            await WriteError(ctx, 401, "UNAUTHORIZED", "authentication required");
+            return;
+        }
         if (!AllowPush(auth, accounts, identity, name))
         {
+            log.LogWarning("Push to '{Repo}' denied for user '{User}': no push permission (can_create={CanCreate}, repo_already_claimed={Claimed})",
+                name, AuthUser(ctx), !identity.IsMaster && accounts.GetCanCreate(identity.AccountId), accounts.AnyPermissionForRepo(name));
             await WriteError(ctx, 403, "DENIED", "no push permission");
             return;
         }
@@ -289,7 +299,7 @@ public static class OciRegistryEndpoints
 
     // ----------------------------------------------------------------- Manifests
 
-    private static async Task HandleManifest(HttpContext ctx, RegistryService reg, Authenticator auth, AccountService accounts, Identity? identity, string name, string reference)
+    private static async Task HandleManifest(HttpContext ctx, RegistryService reg, Authenticator auth, AccountService accounts, Identity? identity, string name, string reference, ILogger log)
     {
         switch (ctx.Request.Method)
         {
@@ -310,8 +320,18 @@ public static class OciRegistryEndpoints
                 return;
 
             case "PUT":
-                if (identity is null) { await WriteError(ctx, 401, "UNAUTHORIZED", "authentication required"); return; }
-                if (!AllowPush(auth, accounts, identity, name)) { await WriteError(ctx, 403, "DENIED", "no push permission"); return; }
+                if (identity is null)
+                {
+                    log.LogWarning("Manifest PUT to '{Repo}' denied: no credentials provided", name);
+                    await WriteError(ctx, 401, "UNAUTHORIZED", "authentication required");
+                    return;
+                }
+                if (!AllowPush(auth, accounts, identity, name))
+                {
+                    log.LogWarning("Manifest PUT to '{Repo}' denied for user '{User}': no push permission", name, AuthUser(ctx));
+                    await WriteError(ctx, 403, "DENIED", "no push permission");
+                    return;
+                }
                 var body = await ReadAllBytes(ctx.Request.Body, ctx.RequestAborted);
                 Digest digest;
                 try
@@ -401,6 +421,11 @@ public static class OciRegistryEndpoints
         await body.CopyToAsync(ms, ct);
         return ms.ToArray();
     }
+
+    // Best-effort username from the Basic auth header, for diagnostic logging only (never the password).
+    private static string AuthUser(HttpContext ctx)
+        => BasicAuthCredentials.TryParse(ctx.Request.Headers.Authorization.ToString(), out var creds)
+            ? creds.Username : "<anonymous>";
 
     private static async Task WriteError(HttpContext ctx, int status, string code, string message)
     {

@@ -221,6 +221,14 @@ h3 { font-size: 1rem; font-weight: 600; margin: 0 0 .75rem; }
 .btn-sm { padding: .35rem .7rem; font-size: .85rem; }
 .btn-block { width: 100%; justify-content: center; }
 
+/* title + inline refresh button */
+.title-row { display: flex; align-items: center; gap: .6rem; margin-bottom: .15rem; }
+.title-row h1 { margin: 0; }
+.btn-refresh { display: inline-flex; align-items: center; justify-content: center; padding: .3rem .55rem; line-height: 1; }
+.refresh-icon { display: inline-block; font-size: 1.15rem; }
+.refresh-icon.spinning { animation: spin .7s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
 /* GitHub link/button */
 .gh-link, .btn-github { display: inline-flex; align-items: center; gap: .5rem; font-weight: 600; }
 .gh-icon { display: inline-block; vertical-align: middle; }
